@@ -1,3 +1,8 @@
 .venv/
 .idea/
 data/
+
+target/
+logs/
+*.duckdb
+raw/
