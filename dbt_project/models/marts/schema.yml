@@ -1,0 +1,25 @@
+version: 2
+
+models:
+  - name: dim_title
+    columns:
+      - name: tconst
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_person
+    columns:
+      - name: nconst
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_title_ratings
+    columns:
+      - name: tconst
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_title')
+              field: tconst
