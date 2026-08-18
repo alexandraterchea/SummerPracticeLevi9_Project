@@ -23,3 +23,24 @@ models:
           - relationships:
               to: ref('dim_title')
               field: tconst
+      - name: start_year
+        tests:
+          - relationships:
+              to: ref('dim_year')
+              field: year
+
+  - name: bridge_title_genres
+    columns:
+      - name: tconst
+        tests:
+          - relationships:
+              to: ref('dim_title')
+              field: tconst
+
+  - name: bridge_title_crew
+    columns:
+      - name: nconst
+        tests:
+          - relationships:
+              to: ref('dim_person')
+              field: nconst
