@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: imdb
+    schema: main
+    tables:
+      - name: title_basics
+      - name: title_ratings
+      - name: title_crew
+      - name: title_principals
+      - name: name_basics
+      - name: title_akas
