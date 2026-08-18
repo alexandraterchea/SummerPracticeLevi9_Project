@@ -1,17 +1,24 @@
+from __future__ import annotations
+
+from datetime import datetime
+from pathlib import Path
+
 from airflow import DAG
+from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
 
-from pathlib import Path
+import duckdb
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from datetime import datetime
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_DIR / "data"
 RAW_DIR = PROJECT_DIR / "raw"
+DBT_PROJECT_DIR = "/opt/airflow/dbt_project"
+DB_PATH = f"{DBT_PROJECT_DIR}/dev.duckdb"
 
 FILES = [
     "name.basics.tsv.gz",
@@ -22,6 +29,15 @@ FILES = [
     "title.principals.tsv.gz",
     "title.ratings.tsv.gz",
 ]
+
+PARQUET_TO_TABLE = {
+    "name.basics.parquet": "name_basics",
+    "title.akas.parquet": "title_akas",
+    "title.basics.parquet": "title_basics",
+    "title.crew.parquet": "title_crew",
+    "title.principals.parquet": "title_principals",
+    "title.ratings.parquet": "title_ratings",
+}
 
 
 def extract_to_parquet():
@@ -85,6 +101,32 @@ def extract_to_parquet():
         print(f"Finished {file} -> {output_path}", flush=True)
 
 
+def load_to_duckdb():
+    con = duckdb.connect(DB_PATH)
+    for parquet_file, table_name in PARQUET_TO_TABLE.items():
+        parquet_path = RAW_DIR / parquet_file
+        if not parquet_path.exists():
+            raise FileNotFoundError(f"Parquet file not found: {parquet_path}")
+        print(f"Loading {parquet_file} -> {table_name}...", flush=True)
+        con.execute(
+            f"CREATE OR REPLACE TABLE {table_name} AS "
+            f"SELECT * FROM read_parquet('{parquet_path}')"
+        )
+        count = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+        print(f"Loaded {count} rows into {table_name}", flush=True)
+    con.close()
+
+
+def validate_load():
+    con = duckdb.connect(DB_PATH)
+    for table_name in PARQUET_TO_TABLE.values():
+        count = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+        if count == 0:
+            raise ValueError(f"Table {table_name} is empty after load")
+        print(f"{table_name}: {count} rows OK", flush=True)
+    con.close()
+
+
 default_args = {
     "owner": "imdb",
     "depends_on_past": False,
@@ -99,20 +141,51 @@ with DAG(
     start_date=datetime(2026, 8, 1),
     schedule=None,
     catchup=False,
+    max_active_tasks=1,
     tags=["imdb", "duckdb", "dbt"],
+    doc_md="""
+    ### IMDb pipeline
+    1. **extract_to_parquet** — TSV.gz → Parquet in raw/
+    2. **load_to_duckdb** — Parquet → DuckDB tables
+    3. **validate_load** — fail fast if any table is empty
+    4. **dbt_run** — staging → intermediate → marts
+    5. **dbt_test** — schema + custom tests
+    """,
 ) as dag:
 
-    start = EmptyOperator(
-        task_id="start",
-    )
+    start = EmptyOperator(task_id="start")
 
     extract = PythonOperator(
         task_id="extract_to_parquet",
         python_callable=extract_to_parquet,
     )
 
-    finish = EmptyOperator(
-        task_id="finish",
+    load = PythonOperator(
+        task_id="load_to_duckdb",
+        python_callable=load_to_duckdb,
     )
 
-    start >> extract >> finish
+    validate = PythonOperator(
+        task_id="validate_load",
+        python_callable=validate_load,
+    )
+
+    dbt_run = BashOperator(
+        task_id="dbt_run",
+        bash_command=(
+            f"cd {DBT_PROJECT_DIR} && "
+            "dbt run --project-dir . --profiles-dir ."
+        ),
+    )
+
+    dbt_test = BashOperator(
+        task_id="dbt_test",
+        bash_command=(
+            f"cd {DBT_PROJECT_DIR} && "
+            "dbt test --project-dir . --profiles-dir ."
+        ),
+    )
+
+    finish = EmptyOperator(task_id="finish")
+
+    start >> extract >> load >> validate >> dbt_run >> dbt_test >> finish
