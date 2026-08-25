@@ -8,8 +8,8 @@ CASE
     WHEN isAdult='0' THEN FALSE
     ELSE NULL
 END AS is_adult,
-NULLIF(startYear, '\N')::INTEGER AS start_year,
-NULLIF(endYear,'\N')::INTEGER AS end_year,
-NULLIF(runtimeMinutes,'\N')::INTEGER AS runtime_minutes,
+TRY_CAST(NULLIF(startYear, '\N') AS INTEGER) AS start_year,
+TRY_CAST(NULLIF(endYear, '\N') AS INTEGER) AS end_year,
+TRY_CAST(NULLIF(runtimeMinutes, '\N') AS INTEGER) AS runtime_minutes,
 NULLIF(genres,'\N') AS genres
 FROM {{source('imdb','title_basics')}}

@@ -1,4 +1,4 @@
-SELECT (start_year/10)*10 AS decade,
+SELECT (CAST(start_year AS INTEGER) / 10) * 10 AS decade,
 ROUND(AVG(runtime_minutes),2) AS avg_runtime_minutes,
 ROUND(AVG(average_rating),2) AS avg_rating,
 COUNT(*) AS title_count

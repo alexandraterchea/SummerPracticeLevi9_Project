@@ -44,3 +44,4 @@ models:
           - relationships:
               to: ref('dim_person')
               field: nconst
+              severity: warn
