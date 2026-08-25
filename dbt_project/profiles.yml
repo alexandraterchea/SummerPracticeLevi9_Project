@@ -1,0 +1,7 @@
+imdb:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: /opt/airflow/dbt_project/dev.duckdb
+      threads: 4
