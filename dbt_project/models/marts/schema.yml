@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: dim_title
+    columns:
+      - name: tconst
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_person
+    columns:
+      - name: nconst
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_title_ratings
+    columns:
+      - name: tconst
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_title')
+              field: tconst
+      - name: start_year
+        tests:
+          - relationships:
+              to: ref('dim_year')
+              field: year
+
+  - name: bridge_title_genres
+    columns:
+      - name: tconst
+        tests:
+          - relationships:
+              to: ref('dim_title')
+              field: tconst
+
+  - name: bridge_title_crew
+    columns:
+      - name: nconst
+        tests:
+          - relationships:
+              to: ref('dim_person')
+              field: nconst
